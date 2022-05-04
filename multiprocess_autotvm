@@ -12,7 +12,7 @@ import _thread
 import threading
 from multiprocessing import Process
 
-
+### THIS IS WHERE WE ARE LOADING THE ENGINE
 lib=tvm.runtime.load_module("/home/nvidia/engine2_gpu_opt_res18.tar")
 
 def inference_fxn(threadName):
@@ -38,6 +38,7 @@ def inference_fxn(threadName):
         #tvm_start=time.time()
         input_name = "data"
         shape_dict = {input_name: img_data.shape}
+        
         ### THIS IS WHERE ACTUALLY IT IS GETTING INVOKED ###
         #lib=tvm.runtime.load_module("./eng1_gpu_opt_resnet18.tar")
         dev = tvm.device(str(target), 0)
