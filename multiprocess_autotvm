@@ -1,0 +1,119 @@
+import onnx
+from tvm.contrib.download import download_testdata
+from PIL import Image
+import numpy as np
+import tvm.relay as relay
+import tvm
+from tvm.contrib import graph_executor
+from tvm.contrib import utils, graph_executor as runtime
+import time
+import timeit
+import _thread
+import threading
+from multiprocessing import Process
+
+
+lib=tvm.runtime.load_module("/home/nvidia/engine2_gpu_opt_res18.tar")
+
+def inference_fxn(threadName):
+        print("Thread is ", threadName)
+        img_path ="./images/n01498041-ILSVRC2012_val_00009734.JPEG"
+        print(img_path)
+        # Resize it to 224x224
+        resized_image = Image.open(img_path).resize((224, 224))
+        img_data = np.asarray(resized_image).astype("float32")
+
+        # Our input image is in HWC layout while ONNX expects CHW input, so convert the array
+        img_data = np.transpose(img_data, (2, 0, 1))
+
+        # Normalize according to the ImageNet input specification
+        imagenet_mean = np.array([0.485, 0.456, 0.406]).reshape((3, 1, 1))
+        imagenet_stddev = np.array([0.229, 0.224, 0.225]).reshape((3, 1, 1))
+        norm_img_data = (img_data / 255 - imagenet_mean) / imagenet_stddev
+
+        # Add the batch dimension, as we are expecting 4-dimensional input: NCHW.
+        img_data = np.expand_dims(norm_img_data, axis=0)
+        target=tvm.target.Target("cuda -arch=sm_72")
+        print("came")
+        #tvm_start=time.time()
+        input_name = "data"
+        shape_dict = {input_name: img_data.shape}
+        ### THIS IS WHERE ACTUALLY IT IS GETTING INVOKED ###
+        #lib=tvm.runtime.load_module("./eng1_gpu_opt_resnet18.tar")
+        dev = tvm.device(str(target), 0)
+        module = graph_executor.GraphModule(lib["default"](dev))
+        print("came here")
+        dtype = "float32"
+        module.set_input(input_name, img_data)
+        since = time.time()
+        for i in range(2000):
+                first_pass=time.time()
+                module.run()
+                last_pass=time.time() - first_pass
+                print("",last_pass, threadName)
+        time_elapsed = time.time() - since
+        print('Time elapsed for optimized inference is',time_elapsed)
+        output_shape = (1, 1000)
+        tvm_output = module.get_output(0, tvm.nd.empty(output_shape)).numpy()
+        since=time.time()
+        timing_number = 10
+        timing_repeat = 10
+        unoptimized = (
+         np.array(timeit.Timer(lambda: module.run()).repeat(repeat=timing_repeat, number=timing_number))
+        * 1000
+        / timing_number
+        )
+
+        print("The UNOPTIMIZED ONE IS",unoptimized)
+        unoptimized = {
+        "mean": np.mean(unoptimized),
+        "median": np.median(unoptimized),
+        "std": np.std(unoptimized),
+        }
+
+
+
+if __name__ == "__main__":
+    # creating thread
+   # t1 = threading.Thread(target=inference_fxn, args=("thread1",))
+   # t2 = threading.Thread(target=inference_fxn, args=("thread2",))
+    p = Process(target=inference_fxn, args=('Process1',))
+    p1 = Process(target=inference_fxn, args=('Process2',))
+   # p2 = Process(target=inference_fxn, args=('Process3',))
+   # p3 = Process(target=inference_fxn, args=('Process4',))
+   # p4 = Process(target=inference_fxn, args=('Process5',))
+   # p5 = Process(target=inference_fxn, args=('Process6',))
+   # p6 = Process(target=inference_fxn, args=('Process7',))
+   # p7 = Process(target=inference_fxn, args=('Process8',))
+   # p8 = Process(target=inference_fxn, args=('Process9',))
+   # p9 = Process(target=inference_fxn, args=('Process10',))
+   # p10 = Process(target=inference_fxn, args=('Process11',))
+    #p11 = Process(target=inference_fxn, args=('Process12',))
+
+    p.start()
+    p1.start()
+   # p2.start()
+   # p3.start()
+   # p4.start()
+   # p5.start()
+   # p6.start()
+   # p7.start()
+   # p8.start()
+   # p9.start()
+   # p10.start()
+   # p11.start()
+
+    p.join()
+    p1.join()
+   # p2.join()
+   # p3.join()
+   # p4.join()
+   # p5.join()
+   # p6.join()
+   # p7.join()
+   # p8.join()
+   # p9.join()
+   # p10.join()
+   # p11.join()
+    print("done")
+   # print("Done!")
